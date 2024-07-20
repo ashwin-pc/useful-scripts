@@ -6,8 +6,8 @@
 // @author       You
 // @match        https://github.com/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
-// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/main/greasemonkey/fetch_github_details.user.js
-// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/main/greasemonkey/fetch_github_details.user.js
+// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/main/userscripts/fetch_github_details.user.js
+// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/main/userscripts/fetch_github_details.user.js
 // @grant        none
 // ==/UserScript==
 

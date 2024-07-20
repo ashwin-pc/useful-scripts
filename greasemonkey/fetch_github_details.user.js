@@ -6,6 +6,8 @@
 // @author       You
 // @match        https://github.com/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
+// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/main/greasemonkey/fetch_github_details.user.js
+// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/main/greasemonkey/fetch_github_details.user.js
 // @grant        none
 // ==/UserScript==
 
@@ -183,6 +185,21 @@
             #arc-clear-token-button:hover {
                 opacity: 1;
             }
+
+            .arc-boost-button-container {
+                display: inline-block;
+                position: relative;
+            }
+
+            #arc-boost-status {
+                position: absolute;
+                left: 0;
+                top: 100%;
+                font-size: 12px;
+                margin-top: 5px;
+                color: #6a737d;
+                white-space: nowrap;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -220,11 +237,20 @@
     }
 
     function addButton(text, onclick) {
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'arc-boost-button-container';
+
         const button = document.createElement('button');
         button.textContent = text;
         button.onclick = onclick;
         button.className = 'arc-boost-button Button--secondary Button--small Button';
         button.id = 'arc-boost-fetch-button';
+
+        const statusElement = document.createElement('div');
+        statusElement.id = 'arc-boost-status';
+
+        buttonContainer.appendChild(button);
+        buttonContainer.appendChild(statusElement);
 
         const possibleLocations = [
             '.pr-review-tools',
@@ -237,15 +263,14 @@
         for (const selector of possibleLocations) {
             const location = document.querySelector(selector);
             if (location) {
-                location.appendChild(button);
+                location.appendChild(buttonContainer);
                 console.log('Button added to', selector);
-                return button;
+                return;
             }
         }
 
-        document.body.appendChild(button);
+        document.body.appendChild(buttonContainer);
         console.log('Button added to body');
-        return button;
     }
 
     function getContext() {
@@ -414,6 +439,13 @@
 
     async function fetchDetails() {
         const button = document.getElementById('arc-boost-fetch-button');
+        const statusElement = document.getElementById('arc-boost-status');
+
+        if (!button || !statusElement) {
+            console.error('Fetch button or status element not found');
+            return;
+        }
+
         button.classList.add('loading');
         button.disabled = true;
 
@@ -422,20 +454,24 @@
             let concatenatedContent = '';
             let dialogTitle = '';
 
+            statusElement.textContent = 'Fetching basic information...';
             if (type === 'pull') {
                 dialogTitle = 'Pull Request Details';
                 const prInfo = await getPrInfo(owner, repo, number);
-                const diffContent = await getPrDiff(owner, repo, number);
-                const { files, fullDiff } = await parseDiff(diffContent);
-
                 concatenatedContent += `Pull Request #${number}\n`;
                 concatenatedContent += `Title: ${prInfo.title}\n\n`;
                 concatenatedContent += `Description:\n${prInfo.body}\n\n`;
                 concatenatedContent += `Base Branch: ${prInfo.baseBranch}\n\n`;
+
+                statusElement.textContent = 'Fetching diff...';
+                const diffContent = await getPrDiff(owner, repo, number);
+                const { files, fullDiff } = await parseDiff(diffContent);
+
                 concatenatedContent += `Full diff for PR #${number}:\n\n${fullDiff}\n\n`;
                 concatenatedContent += `Files changed in PR #${number}:\n\n`;
 
                 for (const file of files) {
+                    statusElement.textContent = `Fetching content: ${file}`;
                     console.log(`Fetching: ${file}`);
                     const content = await getFileContent(owner, repo, file, prInfo.baseBranch);
                     if (content === null) {
@@ -447,8 +483,6 @@
             } else if (type === 'issues') {
                 dialogTitle = 'Issue Details';
                 const issueInfo = await getIssueInfo(owner, repo, number);
-                const comments = await getIssueComments(owner, repo, number);
-
                 concatenatedContent += `Issue #${number}\n`;
                 concatenatedContent += `Title: ${issueInfo.title}\n\n`;
                 concatenatedContent += `Description:\n${issueInfo.body}\n\n`;
@@ -462,6 +496,9 @@
                     concatenatedContent += `Closed: ${issueInfo.closedAt}\n`;
                 }
                 concatenatedContent += `Reactions: ${formatReactions(issueInfo.reactions)}\n`;
+
+                statusElement.textContent = 'Fetching comments...';
+                const comments = await getIssueComments(owner, repo, number);
                 concatenatedContent += `\nComments:\n\n`;
 
                 for (const comment of comments) {
@@ -473,13 +510,19 @@
                 throw new Error('Unsupported page type');
             }
 
+            statusElement.textContent = 'Displaying results...';
             showDialog(concatenatedContent, dialogTitle);
         } catch (error) {
             console.error('Error:', error);
             alert('Error fetching details. Check console for more information.');
         } finally {
-            button.classList.remove('loading');
-            button.disabled = false;
+            if (button) {
+                button.classList.remove('loading');
+                button.disabled = false;
+            }
+            if (statusElement) {
+                statusElement.textContent = '';
+            }
         }
     }
 
@@ -496,11 +539,54 @@
         dialog.showModal();
     }
 
+    function observeUrlChanges(callback) {
+        const originalPushState = history.pushState;
+        const originalReplaceState = history.replaceState;
+
+        function onUrlChange() {
+            callback();
+        }
+
+        history.pushState = function (...args) {
+            originalPushState.apply(this, args);
+            onUrlChange();
+        };
+
+        history.replaceState = function (...args) {
+            originalReplaceState.apply(this, args);
+            onUrlChange();
+        };
+
+        window.addEventListener('popstate', onUrlChange);
+    }
+
+    function isValidPage() {
+        const { pathname } = window.location;
+        const pathParts = pathname.split('/');
+
+        // Check if the path matches the pattern for issues or pull requests
+        return (pathParts.length === 5 && (pathParts[3] === 'issues' || pathParts[3] === 'pull'));
+    }
+
     // Main setup function
     function initScript() {
         addStyles();
         createDialog();
-        addButton('Fetch Details', fetchDetails);
+
+        function addButtonIfValid() {
+            if (isValidPage() && !document.getElementById('arc-boost-fetch-button')) {
+                addButton('Fetch Details', fetchDetails);
+            }
+        }
+
+        addButtonIfValid(); // Check and add button on initial load
+
+        // Observe URL changes and re-add the button if needed
+        observeUrlChanges(() => {
+            setTimeout(() => {
+                addButtonIfValid();
+            }, 500); // Delay to ensure the new content is loaded
+        });
 
         // Add a less obtrusive clear config button
         const clearButton = document.createElement('button');

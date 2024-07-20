@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         Claude prompt manager
 // @namespace    http://tampermonkey.net/
-// @version      2024-07-23
+// @version      2024-07-20
 // @description  Manage claude prompts in a github gist
 // @author       You
 // @match        https://claude.ai/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=claude.ai
-// @updateURL    https://gist.github.com/ashwin-pc/e2ac62c08c732ce73f6a94a10f7a36d3/raw/prompt_manager.user.js
-// @downloadURL  https://gist.github.com/ashwin-pc/e2ac62c08c732ce73f6a94a10f7a36d3/raw/prompt_manager.user.js
+// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/main/greasemonkey/claude_prompt_manager.user.js
+// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/main/greasemonkey/claude_prompt_manager.user.js
 // @grant        none
 // ==/UserScript==
 

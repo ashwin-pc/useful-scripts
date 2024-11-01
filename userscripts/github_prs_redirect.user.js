@@ -6,6 +6,8 @@
 // @match        https://github.com/*/*/pulls
 // @match        https://github.com/*/*/pulls?*
 // @grant        none
+// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/main/userscripts/github_prs_redirect.user.js
+// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/main/userscripts/github_prs_redirect.user.js
 // ==/UserScript==
 
 (function() {

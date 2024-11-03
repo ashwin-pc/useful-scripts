@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         OpenSearch Dashboard URL Parameter Monitor
 // @namespace    http://tampermonkey.net/
-// @version      0.2
+// @version      0.3
 // @description  Monitor and display OpenSearch Dashboard URL parameters with state differences
 // @author       Ashwin Pc
 // @match        http://localhost:5601/*
@@ -9,8 +9,8 @@
 // @require      https://cdn.jsdelivr.net/npm/rison@0.1.1/js/rison.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/deep-diff/1.0.2/deep-diff.min.js
 // @grant        none
-// @updateURL    https://raw.githubusercontent.com/ashwin-pc/useful-scripts/main/userscripts/osd_url_state_monitor.user.js
-// @downloadURL  https://raw.githubusercontent.com/ashwin-pc/useful-scripts/main/userscripts/osd_url_state_monitor.user.js
+// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/refs/heads/main/userscripts/osd_url_state_monitor.user.js
+// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/refs/heads/main/userscripts/osd_url_state_monitor.user.js
 // ==/UserScript==
 
 (function() {

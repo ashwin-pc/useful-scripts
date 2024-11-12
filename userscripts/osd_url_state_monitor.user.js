@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         OpenSearch Dashboard URL Parameter Monitor
 // @namespace    http://tampermonkey.net/
-// @version      0.3
+// @version      0.4
 // @description  Monitor and display OpenSearch Dashboard URL parameters with state differences
 // @author       Ashwin Pc
-// @match        http://localhost:5601/*
-// @match        https://localhost:5601/*
+// @match        http://*/app/*
+// @match        https://*/app/*
 // @require      https://cdn.jsdelivr.net/npm/rison@0.1.1/js/rison.js
 // @require      https://cdnjs.cloudflare.com/ajax/libs/deep-diff/1.0.2/deep-diff.min.js
 // @grant        none

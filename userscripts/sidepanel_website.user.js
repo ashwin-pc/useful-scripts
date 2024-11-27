@@ -101,11 +101,9 @@
                 }
 
                 .panel-header {
-                    height: 48px;
                     background-color: #1a202c;
                     display: flex;
                     align-items: center;
-                    padding: 0 16px;
                     color: white;
                     border-bottom: 1px solid rgba(255,255,255,0.1);
                 }
@@ -115,7 +113,6 @@
                     margin: 0 12px;
                     padding: 8px 12px;
                     border: none;
-                    border-radius: 6px;
                     background-color: rgba(255,255,255,0.1);
                     color: white;
                     font-size: 14px;
@@ -133,7 +130,7 @@
 
                 .close-button {
                     cursor: pointer;
-                    padding: 8px;
+                    padding: 0 20px;
                     color: #a0aec0;
                     font-size: 20px;
                     transition: all 0.2s ease;
@@ -141,6 +138,7 @@
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    transform: translateY(-3px);
                 }
 
                 .close-button:hover {
@@ -186,7 +184,7 @@
 
         // Add iframe wrapper with proper height
         const iframeWrapper = document.createElement('div');
-        iframeWrapper.style.cssText = 'width: 100%; height: calc(100% - 48px); position: relative;';
+        iframeWrapper.style.cssText = 'width: 100%; height: calc(100% - 30px); position: relative;';
         iframe.style.cssText = 'width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0;';
         iframeWrapper.appendChild(iframe);
 

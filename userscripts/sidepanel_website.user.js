@@ -1,12 +1,14 @@
 // ==UserScript==
 // @name         Floating Website Sidepanel
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Adds a floating button that expands into a sidepanel containing a website of your choice
-// @author       You
+// @author       Ashwin Pc
 // @match        *://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @updateURL    https://raw.githubusercontent.com/ashwin-pc/useful-scripts/main/userscripts/sidepanel_website.user.js
+// @downloadURL  https://raw.githubusercontent.com/ashwin-pc/useful-scripts/main/userscripts/sidepanel_website.user.js
 // ==/UserScript==
 
 (function() {

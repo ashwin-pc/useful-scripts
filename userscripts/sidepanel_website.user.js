@@ -7,8 +7,8 @@
 // @match        *://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @updateURL    https://raw.githubusercontent.com/ashwin-pc/useful-scripts/main/userscripts/sidepanel_website.user.js
-// @downloadURL  https://raw.githubusercontent.com/ashwin-pc/useful-scripts/main/userscripts/sidepanel_website.user.js
+// @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/refs/heads/main/userscripts/sidepanel_website.user.js
+// @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/refs/heads/main/userscripts/sidepanel_website.user.js
 // ==/UserScript==
 
 (function() {

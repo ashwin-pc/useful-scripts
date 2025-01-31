@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Floating Website Sidepanel
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  Adds a floating button that expands into a sidepanel containing a website of your choice
 // @author       Ashwin Pc
 // @match        *://*/*

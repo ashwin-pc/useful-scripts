@@ -7,11 +7,12 @@
 // @match        *://*/*
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_registerMenuCommand
 // @updateURL    https://github.com/ashwin-pc/useful-scripts/raw/refs/heads/main/userscripts/sidepanel_website.user.js
 // @downloadURL  https://github.com/ashwin-pc/useful-scripts/raw/refs/heads/main/userscripts/sidepanel_website.user.js
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
     // Prevent script from running in iframes
@@ -24,6 +25,7 @@
         let currentWebsite = GM_getValue('sidepanel_website', DEFAULT_WEBSITE);
         let isPanelOpen = false;
         let dragStartTime = 0;
+        let hotkey = GM_getValue('sidepanel_hotkey', 'Alt+S');
 
         // Initialize drag state
         let isDragging = false;
@@ -33,6 +35,48 @@
         let initialY;
         let xOffset;
         let yOffset;
+
+        // Function to toggle the sidepanel
+        function toggleSidepanel() {
+            isPanelOpen = !isPanelOpen;
+            panel.classList.toggle('open');
+        }
+
+        // Function to change the hotkey
+        function changeHotkey() {
+            const newHotkey = prompt('Enter new hotkey (e.g., "Alt+S"):', hotkey);
+            if (newHotkey && /^(Alt|Ctrl|Shift)\+[A-Z]$/i.test(newHotkey)) {
+                hotkey = newHotkey;
+                GM_setValue('sidepanel_hotkey', hotkey);
+                alert(`Hotkey changed to ${hotkey}`);
+            } else {
+                alert('Invalid hotkey format. Please use Alt+Key, Ctrl+Key, or Shift+Key.');
+            }
+        }
+
+        // Register menu command to change hotkey
+        GM_registerMenuCommand('Change Sidepanel Hotkey', changeHotkey);
+
+        // Hotkey listener
+        document.addEventListener('keydown', function (e) {
+            const [modifier, key] = hotkey.split('+');
+            console.log('Keypress detected:', {
+                pressedKey: e.key,
+                pressedModifier: {
+                    alt: e.altKey,
+                    ctrl: e.ctrlKey,
+                    shift: e.shiftKey
+                },
+                expectedHotkey: hotkey,
+                expectedModifier: modifier,
+                expectedKey: key
+            });
+
+            if (e.key.toLowerCase() === key.toLowerCase() && e[modifier.toLowerCase() + 'Key']) {
+                e.preventDefault();
+                toggleSidepanel();
+            }
+        });
 
         // Function to ensure coordinates are within viewport
         function getValidPosition(x, y) {
@@ -263,8 +307,7 @@
                 }
 
                 if (dragDuration < DRAG_THRESHOLD) {
-                    isPanelOpen = !isPanelOpen;
-                    panel.classList.toggle('open');
+                    toggleSidepanel();
                 }
             }
         }
@@ -276,7 +319,7 @@
         button.addEventListener('dblclick', resetButtonPosition);
 
         // URL input handler
-        urlInput.addEventListener('keypress', function(e) {
+        urlInput.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 let url = urlInput.value.trim();
                 try {
@@ -300,10 +343,7 @@
         });
 
         // Close button handler
-        closeButton.addEventListener('click', function() {
-            panel.classList.remove('open');
-            isPanelOpen = false;
-        });
+        closeButton.addEventListener('click', toggleSidepanel);
 
         // Window resize handler
         window.addEventListener('resize', () => {

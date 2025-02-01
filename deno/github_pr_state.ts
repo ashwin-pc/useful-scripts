@@ -30,11 +30,33 @@ function determinePRState(prData: any): string {
     return "Approved";
   }
 
-  const changesRequestedReviews = prData.reviews?.filter(
-    (review: any) => review.state === "CHANGES_REQUESTED"
-  );
-  if (changesRequestedReviews && changesRequestedReviews.length > 0) {
-    return "Changes_Requested";
+  // Combine reviews and comments to determine the last activity
+  let activities: { time: number; user: string }[] = [];
+  if (prData.reviews && prData.reviews.length > 0) {
+    activities = activities.concat(
+      prData.reviews.map((r: any) => ({
+        time: new Date(r.submitted_at).getTime(),
+        user: r.user.login,
+      }))
+    );
+  }
+  if (prData.comments && prData.comments.length > 0) {
+    activities = activities.concat(
+      prData.comments.map((c: any) => ({
+        time: new Date(c.created_at).getTime(),
+        user: c.user.login,
+      }))
+    );
+  }
+
+  if (activities.length > 0) {
+    activities.sort((a, b) => a.time - b.time);
+    const lastActivity = activities[activities.length - 1];
+    if (lastActivity.user === prData.user.login) {
+      return "Review_Pending";
+    } else {
+      return "Changes_Requested";
+    }
   }
 
   if (prData.assignees && prData.assignees.length > 0) {
@@ -59,7 +81,7 @@ async function fetchPRDetails(owner: string, repo: string, prNumber: number) {
 
   const prData = await response.json();
 
-  // Fetch reviews separately as they're not included in the PR data
+  // Fetch reviews
   const reviewsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews`;
   const reviewsResponse = await fetch(reviewsUrl, {
     headers: {
@@ -67,15 +89,25 @@ async function fetchPRDetails(owner: string, repo: string, prNumber: number) {
       Accept: "application/vnd.github.v3+json",
     },
   });
-
   if (!reviewsResponse.ok) {
     throw new Error(`HTTP error! status: ${reviewsResponse.status}`);
   }
-
   const reviews = await reviewsResponse.json();
-
-  // Add reviews to the PR data
   prData.reviews = reviews;
+
+  // Fetch issue comments (PR comments)
+  const commentsUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`;
+  const commentsResponse = await fetch(commentsUrl, {
+    headers: {
+      Authorization: `token ${GITHUB_TOKEN}`,
+      Accept: "application/vnd.github.v3+json",
+    },
+  });
+  if (!commentsResponse.ok) {
+    throw new Error(`HTTP error! status: ${commentsResponse.status}`);
+  }
+  const comments = await commentsResponse.json();
+  prData.comments = comments;
 
   return prData;
 }
@@ -85,7 +117,6 @@ function parsePRInput(input: string): {
   repo: string;
   prNumber: number;
 } {
-  // Check if input is a URL
   if (input.startsWith("http")) {
     const url = new URL(input);
     const parts = url.pathname.split("/");
@@ -98,7 +129,6 @@ function parsePRInput(input: string): {
     }
   }
 
-  // Check if input is just a number
   if (/^\d+$/.test(input)) {
     return {
       owner: "opensearch-project",
@@ -113,7 +143,12 @@ function parsePRInput(input: string): {
 }
 
 async function main() {
-  const input = prompt("Please enter the PR number or full GitHub PR URL:");
+  let input;
+  if (Deno.args.length > 0) {
+    input = Deno.args[0];
+  } else {
+    input = prompt("Please enter the PR number or full GitHub PR URL:");
+  }
 
   if (!input) {
     console.error("No input provided. Exiting.");
@@ -125,10 +160,13 @@ async function main() {
     const prData = await fetchPRDetails(owner, repo, prNumber);
     const state = determinePRState(prData);
 
-    // console.log("PR Details:", JSON.stringify(prData, null, 2));
     console.log("\nDetermined State:", state);
   } catch (error) {
-    console.error("Error:", error.message);
+    if (error instanceof Error) {
+      console.error("Error:", error.message);
+    } else {
+      console.error("Unknown error:", error);
+    }
   }
 }
 

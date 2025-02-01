@@ -1,4 +1,4 @@
-import { config } from "https://deno.land/x/dotenv/mod.ts";
+import { config } from "https://deno.land/x/dotenv@v3.2.2/mod.ts";
 
 // Load environment variables
 config({ export: true });
@@ -30,7 +30,7 @@ function determinePRState(prData: any): string {
     return "Approved";
   }
 
-  // Combine reviews and comments to determine the last activity
+  // Combine reviews, comments, and commits to determine the last activity
   let activities: { time: number; user: string }[] = [];
   if (prData.reviews && prData.reviews.length > 0) {
     activities = activities.concat(
@@ -47,6 +47,21 @@ function determinePRState(prData: any): string {
         user: c.user.login,
       }))
     );
+  }
+  if (prData.commits && prData.commits.length > 0) {
+    const commitActivities = prData.commits
+      .map((commit: any) => {
+        // Only include commit if authored by a GitHub user
+        if (commit.author && commit.commit && commit.commit.committer) {
+          return {
+            time: new Date(commit.commit.committer.date).getTime(),
+            user: commit.author.login,
+          };
+        }
+        return null;
+      })
+      .filter((activity: any) => activity !== null);
+    activities = activities.concat(commitActivities);
   }
 
   if (activities.length > 0) {
@@ -108,6 +123,20 @@ async function fetchPRDetails(owner: string, repo: string, prNumber: number) {
   }
   const comments = await commentsResponse.json();
   prData.comments = comments;
+
+  // Fetch commits
+  const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/commits`;
+  const commitsResponse = await fetch(commitsUrl, {
+    headers: {
+      Authorization: `token ${GITHUB_TOKEN}`,
+      Accept: "application/vnd.github.v3+json",
+    },
+  });
+  if (!commitsResponse.ok) {
+    throw new Error(`HTTP error! status: ${commitsResponse.status}`);
+  }
+  const commits = await commitsResponse.json();
+  prData.commits = commits;
 
   return prData;
 }

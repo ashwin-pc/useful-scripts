@@ -17,7 +17,7 @@
                 "--inspect-brk",
                 "--allow-all",
                 "deno/github_pr_state.ts",
-                "9291"
+                "9312"
             ],
             "attachSimplePort": 9229
         }

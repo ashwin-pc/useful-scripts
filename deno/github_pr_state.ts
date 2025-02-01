@@ -10,52 +10,61 @@ if (!GITHUB_TOKEN) {
   Deno.exit(1);
 }
 
-function determinePRState(prData: any): string {
-  if (prData.draft) {
-    return "Draft";
-  }
+// Add a list of bot logins to filter out
+const BOT_LOGINS = [
+  "codecov",
+  "dependabot",
+  "github-actions",
+  "opensearch-changeset-bot[bot]",
+  "github-actions[bot]",
+]; // add bot logins as needed
 
-  if (prData.merged) {
-    return "Merged";
-  }
+// Updated determinePRState to include granular reasons based on activity type.
+function determinePRState(pr: any): { state: string; reason: string } {
+  if (pr.isDraft)
+    return { state: "Draft", reason: "The PR is marked as draft." };
+  if (pr.merged) return { state: "Merged", reason: "The PR has been merged." };
+  if (pr.state === "CLOSED")
+    return { state: "Closed", reason: "The PR is closed." };
 
-  if (prData.state === "closed") {
-    return "Closed";
-  }
-
-  const approvedReviews = prData.reviews?.filter(
-    (review: any) => review.state === "APPROVED"
+  const approvedReviews = pr.reviews.nodes.filter(
+    (r: any) => r.state === "APPROVED"
   );
-  if (approvedReviews && approvedReviews.length > 1) {
-    return "Approved";
-  }
+  if (approvedReviews && approvedReviews.length > 1)
+    return {
+      state: "Approved",
+      reason: "There are multiple approved reviews indicating readiness.",
+    };
 
-  // Combine reviews, comments, and commits to determine the last activity
-  let activities: { time: number; user: string }[] = [];
-  if (prData.reviews && prData.reviews.length > 0) {
+  // Build activities without fetching body; for comments, check if the author is a bot.
+  let activities: { time: number; user: string; type: string }[] = [];
+  if (pr.reviews.nodes.length > 0) {
     activities = activities.concat(
-      prData.reviews.map((r: any) => ({
-        time: new Date(r.submitted_at).getTime(),
-        user: r.user.login,
+      pr.reviews.nodes.map((r: any) => ({
+        time: new Date(r.submittedAt).getTime(),
+        user: r.author.login,
+        type: "review",
       }))
     );
   }
-  if (prData.comments && prData.comments.length > 0) {
+  if (pr.comments.nodes.length > 0) {
     activities = activities.concat(
-      prData.comments.map((c: any) => ({
-        time: new Date(c.created_at).getTime(),
-        user: c.user.login,
+      pr.comments.nodes.map((c: any) => ({
+        time: new Date(c.createdAt).getTime(),
+        user: c.author.login,
+        type: "comment",
       }))
     );
   }
-  if (prData.commits && prData.commits.length > 0) {
-    const commitActivities = prData.commits
-      .map((commit: any) => {
-        // Only include commit if authored by a GitHub user
-        if (commit.author && commit.commit && commit.commit.committer) {
+  if (pr.commits.nodes.length > 0) {
+    const commitActivities = pr.commits.nodes
+      .map((node: any) => {
+        const commit = node.commit;
+        if (commit.author && commit.committer && commit.author.user) {
           return {
-            time: new Date(commit.commit.committer.date).getTime(),
-            user: commit.author.login,
+            time: new Date(commit.committer.date).getTime(),
+            user: commit.author.user.login,
+            type: "commit",
           };
         }
         return null;
@@ -65,80 +74,119 @@ function determinePRState(prData: any): string {
   }
 
   if (activities.length > 0) {
+    // Sort by time ascending.
     activities.sort((a, b) => a.time - b.time);
-    const lastActivity = activities[activities.length - 1];
-    if (lastActivity.user === prData.user.login) {
-      return "Review_Pending";
+    // Iterate backward to find the last valid activity not from a bot.
+    let lastActivity: (typeof activities)[number] | undefined = undefined;
+    for (let i = activities.length - 1; i >= 0; i--) {
+      const act = activities[i];
+      // Skip any activity if the author is from a known bot.
+      if (
+        BOT_LOGINS.some((bot) => bot.toLowerCase() === act.user.toLowerCase())
+      ) {
+        continue;
+      }
+      lastActivity = act;
+      break;
+    }
+    // If no non-bot activity was found...
+    if (!lastActivity) {
+      if (pr.assignees.nodes.length > 0) {
+        return {
+          state: "Review_Pending",
+          reason:
+            "All activities were performed by bots, but assignees exist so review is pending.",
+        };
+      } else {
+        return {
+          state: "Unassigned",
+          reason:
+            "All activities were performed by bots and no assignees are present, so the PR is unassigned.",
+        };
+      }
+    }
+
+    if (lastActivity.user === pr.author.login) {
+      return {
+        state: "Review_Pending",
+        reason: `The last ${lastActivity.type} was by the PR author (${lastActivity.user}); awaiting external review.`,
+      };
     } else {
-      return "Changes_Requested";
+      if (lastActivity.type === "review") {
+        const lastReview = pr.reviews.nodes.find(
+          (review: any) =>
+            review.author.login === lastActivity.user &&
+            new Date(review.submittedAt).getTime() === lastActivity.time
+        );
+        if (lastReview && lastReview.state === "APPROVED") {
+          return {
+            state: "Review_Pending",
+            reason: `The last review was an approval by ${lastActivity.user}; awaiting additional review.`,
+          };
+        } else {
+          return {
+            state: "Changes_Requested",
+            reason: `The last review by ${lastActivity.user} did not approve changes and is treated as a changes request.`,
+          };
+        }
+      } else {
+        return {
+          state: "Changes_Requested",
+          reason: `The last ${lastActivity.type} was by reviewer (${lastActivity.user}); changes have been requested.`,
+        };
+      }
     }
   }
+  if (pr.assignees.nodes.length > 0)
+    return {
+      state: "Review_Pending",
+      reason:
+        "Assignees are set on the PR which indicates that review is pending.",
+    };
 
-  if (prData.assignees && prData.assignees.length > 0) {
-    return "Review_Pending";
-  }
-
-  return "Unassigned";
+  return {
+    state: "Unassigned",
+    reason: "No activity, approvals, or assignees were found on the PR.",
+  };
 }
 
 async function fetchPRDetails(owner: string, repo: string, prNumber: number) {
-  const url = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}`;
-  const response = await fetch(url, {
+  const query = `
+    query($owner: String!, $repo: String!, $number: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $number) {
+          isDraft
+          merged
+          state
+          author { login }
+          reviews(last: 100) { nodes { state submittedAt author { login } } }
+          comments(last: 100) { nodes { createdAt author { login } } }
+          commits(last: 100) { nodes { commit { committer { date } author { user { login } } } } }
+          assignees(last: 10) { nodes { login } }
+        }
+      }
+    }
+  `;
+  const variables = { owner, repo, number: prNumber };
+
+  const response = await fetch("https://api.github.com/graphql", {
+    method: "POST",
     headers: {
       Authorization: `token ${GITHUB_TOKEN}`,
-      Accept: "application/vnd.github.v3+json",
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({ query, variables }),
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    throw new Error(`GraphQL error: ${response.status}`);
   }
-
-  const prData = await response.json();
-
-  // Fetch reviews
-  const reviewsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews`;
-  const reviewsResponse = await fetch(reviewsUrl, {
-    headers: {
-      Authorization: `token ${GITHUB_TOKEN}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-  });
-  if (!reviewsResponse.ok) {
-    throw new Error(`HTTP error! status: ${reviewsResponse.status}`);
+  const json = await response.json();
+  if (json.errors) {
+    throw new Error(json.errors[0].message);
   }
-  const reviews = await reviewsResponse.json();
-  prData.reviews = reviews;
-
-  // Fetch issue comments (PR comments)
-  const commentsUrl = `https://api.github.com/repos/${owner}/${repo}/issues/${prNumber}/comments`;
-  const commentsResponse = await fetch(commentsUrl, {
-    headers: {
-      Authorization: `token ${GITHUB_TOKEN}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-  });
-  if (!commentsResponse.ok) {
-    throw new Error(`HTTP error! status: ${commentsResponse.status}`);
-  }
-  const comments = await commentsResponse.json();
-  prData.comments = comments;
-
-  // Fetch commits
-  const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/commits`;
-  const commitsResponse = await fetch(commitsUrl, {
-    headers: {
-      Authorization: `token ${GITHUB_TOKEN}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-  });
-  if (!commitsResponse.ok) {
-    throw new Error(`HTTP error! status: ${commitsResponse.status}`);
-  }
-  const commits = await commitsResponse.json();
-  prData.commits = commits;
-
-  return prData;
+  // Return the pullRequest field directly for convenience.
+  return json.data.repository.pullRequest;
 }
 
 function parsePRInput(input: string): {
@@ -187,9 +235,10 @@ async function main() {
   try {
     const { owner, repo, prNumber } = parsePRInput(input);
     const prData = await fetchPRDetails(owner, repo, prNumber);
-    const state = determinePRState(prData);
+    const result = determinePRState(prData);
 
-    console.log("\nDetermined State:", state);
+    console.log(`\nDetermined State: ${result.state}`);
+    console.log(`Reason: ${result.reason}`);
   } catch (error) {
     if (error instanceof Error) {
       console.error("Error:", error.message);
